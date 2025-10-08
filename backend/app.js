@@ -23,6 +23,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/todoapp')
 // Routes
 app.use('/api/todos', todoRoutes);
 
+
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Todo API Server is running!',
