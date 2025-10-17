@@ -1,43 +1,29 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://api.carpeldreams.me/api';
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
+  withCredentials: false
 });
 
-export const todoAPI = {
-  // Get all todos with optional filters
-  getTodos: (filters = {}) => {
-    const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value);
-      }
-    });
-    return api.get(`/todos?${params.toString()}`);
-  },
+// Helper to unwrap { success, data } responses
+const unwrap = promise => promise.then(res => res?.data?.data ?? res?.data);
 
-  // Get a specific todo
-  getTodo: (id) => api.get(`/todos/${id}`),
+// Medicines API
+export const getMedicines = () => unwrap(api.get('/api/medicines'));
+export const createMedicine = (payload) => unwrap(api.post('/api/medicines', payload));
+export const updateMedicine = (id, payload) => unwrap(api.put(`/api/medicines/${id}`, payload));
+export const deleteMedicine = (id) => unwrap(api.delete(`/api/medicines/${id}`));
 
-  // Create a new todo
-  createTodo: (todoData) => api.post('/todos', todoData),
+// Schedules API
+export const getSchedules = () => unwrap(api.get('/api/schedules'));
+export const getTodaySchedules = () => unwrap(api.get('/api/schedules/today'));
+export const getUpcomingDoses = (days = 7) => unwrap(api.get(`/api/schedules/upcoming?days=${days}`));
+export const createSchedule = (payload) => unwrap(api.post('/api/schedules', payload));
+export const updateSchedule = (id, payload) => unwrap(api.put(`/api/schedules/${id}`, payload));
+export const deleteSchedule = (id) => unwrap(api.delete(`/api/schedules/${id}`));
 
-  // Update a todo
-  updateTodo: (id, todoData) => api.put(`/todos/${id}`, todoData),
-
-  // Toggle todo completion
-  toggleTodo: (id) => api.patch(`/todos/${id}/toggle`),
-
-  // Delete a todo
-  deleteTodo: (id) => api.delete(`/todos/${id}`),
-
-  // Get statistics
-  getStats: () => api.get('/todos/stats/overview'),
-};
+// Dose tracking
+export const markDoseAsTaken = (scheduleId, time, date = null) =>
+  unwrap(api.post(`/api/schedules/${scheduleId}/doses/mark`, { time, date }));
 
 export default api;
