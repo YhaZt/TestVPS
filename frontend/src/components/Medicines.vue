@@ -2,7 +2,7 @@
   <div class="medicines-container">
     <div class="header">
       <h2>Medicines</h2>
-      <button @click="showAddModal = true" class="btn-primary">+ Add Medicine</button>
+      <!-- <button @click="showAddModal = true" class="btn-primary">+ Add Medicine</button> -->
     </div>
 
     <div v-if="loading" class="loading">Loading medicines...</div>
@@ -17,8 +17,8 @@
         <p v-if="medicine.notes" class="notes">📝 {{ medicine.notes }}</p>
 
         <div class="actions">
-          <button @click="editMedicine(medicine)" class="btn-edit">✏️</button>
-          <button @click="deleteMedicine(medicine._id)" class="btn-delete">🗑️</button>
+          <!-- <button @click="editMedicine(medicine)" class="btn-edit">✏️</button>
+          <button @click="deleteMedicine(medicine._id)" class="btn-delete">🗑️</button> -->
         </div>
       </div>
     </div>

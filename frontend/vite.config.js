@@ -48,6 +48,9 @@ export default defineConfig({
             purpose: 'maskable any'
           }
         ]
+      },
+      devOptions: {
+        enabled: true
       }
     })
   ],

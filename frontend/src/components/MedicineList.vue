@@ -2,7 +2,7 @@
   <div class="medicine-list">
     <div class="header">
       <h2>Medicines</h2>
-      <button @click="showAddForm = true" class="btn-add">+ Add Medicine</button>
+      <!-- <button @click="showAddForm = true" class="btn-add">+ Add Medicine</button> -->
     </div>
 
     <!-- Add/Edit Form -->
