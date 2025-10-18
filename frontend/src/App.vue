@@ -8,12 +8,34 @@
         </div>
         <nav class="main-nav">
           <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            @click="activeTab = tab.id"
-            :class="['nav-button', { active: activeTab === tab.id }]"
+            @click="activeTab = 'today'"
+            :class="['nav-button', { active: activeTab === 'today' }]"
           >
-            {{ tab.label }}
+            📅 Today
+          </button>
+          <button
+            @click="activeTab = 'calendar'"
+            :class="['nav-button', { active: activeTab === 'calendar' }]"
+          >
+            📆 Calendar
+          </button>
+          <button
+            @click="activeTab = 'medicines'"
+            :class="['nav-button', { active: activeTab === 'medicines' }]"
+          >
+            💊 Medicines
+          </button>
+          <button
+            @click="activeTab = 'schedules'"
+            :class="['nav-button', { active: activeTab === 'schedules' }]"
+          >
+            ⏰ Schedules
+          </button>
+          <button
+            @click="activeTab = 'stats'"
+            :class="['nav-button', { active: activeTab === 'stats' }]"
+          >
+            📊 Stats
           </button>
           <router-link to="/calendar" class="nav-link">Calendar</router-link>
         </nav>
@@ -33,8 +55,13 @@
               v-if="activeTab === 'today'"
               @dose-taken="refreshStats"
             />
-            <MedicineList v-if="activeTab === 'medicines'" />
-            <ScheduleList v-if="activeTab === 'schedules'" @schedule-updated="refreshStats" />
+            <CalendarView
+              v-if="activeTab === 'calendar'"
+              @dose-taken="refreshStats"
+            />
+            <MedicineManager v-if="activeTab === 'medicines'" />
+            <ScheduleManager v-if="activeTab === 'schedules'" @schedule-updated="refreshStats" />
+            <StatsWidget v-if="activeTab === 'stats'" />
           </div>
 
           <!-- Desktop Stats Widget (sidebar) -->
@@ -49,18 +76,20 @@
 </template>
 
 <script>
-import MedicineList from './components/MedicineList.vue';
-import ScheduleList from './components/ScheduleList.vue';
+import MedicineManager from './components/MedicineManager.vue';
+import ScheduleManager from './components/ScheduleManager.vue';
 import TodaySchedule from './components/TodaySchedule.vue';
 import StatsWidget from './components/StatsWidget.vue';
+import CalendarView from './components/CalendarView.vue';
 
 export default {
   name: 'App',
   components: {
-    MedicineList,
-    ScheduleList,
+    MedicineManager,
+    ScheduleManager,
     TodaySchedule,
-    StatsWidget
+    StatsWidget,
+    CalendarView
   },
   data() {
     return {
