@@ -3,7 +3,7 @@
     <header class="app-header">
         <div class="container">
         <div class="logo">
-          <span class="logo-icon">💊</span>
+          <span class="logo-icon">🏥</span>
           <h1>Medicine Scheduler</h1>
         </div>
         <nav class="main-nav">
@@ -23,9 +23,9 @@
       <div class="container">
         <div class="main-layout">
           <div class="content-area">
+            <TodaySchedule v-if="activeTab === 'today'" />
             <MedicineList v-if="activeTab === 'medicines'" />
             <ScheduleList v-if="activeTab === 'schedules'" />
-            <TodaySchedule v-if="activeTab === 'today'" />
           </div>
 
           <aside class="sidebar">
@@ -54,11 +54,11 @@ export default {
   },
   data() {
     return {
-      activeTab: 'medicines',
+      activeTab: 'today', // Changed from 'medicines' to 'today'
       tabs: [
+        { id: 'today', label: "Today's Doses" }, // Moved to first position
         { id: 'medicines', label: 'Medicines' },
-        { id: 'schedules', label: 'Schedules' },
-        { id: 'today', label: "Today's Doses" }
+        { id: 'schedules', label: 'Schedules' }
       ]
     };
   }
