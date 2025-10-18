@@ -51,11 +51,13 @@
               v-if="isDoseReady(dose.time) && !dose.taken"
               @click="markAsTaken(dose)"
               class="btn-take-dose"
+              :disabled="markingDose"
             >
-              ✓ Mark as Taken
+              {{ markingDose ? '⏳ Saving...' : '✓ Mark as Taken' }}
             </button>
             <div v-else-if="dose.taken" class="taken-info">
-              <span class="taken-time">Taken at {{ formatTime(dose.takenAt) }}</span>
+              <span class="taken-time">✓ Taken at {{ formatTime(dose.takenAt) }}</span>
+              <button @click="unmarkDose(dose)" class="btn-unmark">↶ Undo</button>
             </div>
           </div>
         </div>
@@ -70,25 +72,23 @@
 </template>
 
 <script>
-import { getSchedules, getMedicines } from '../services/api';
+import { getTodaySchedules, markDoseAsTaken, unmarkDose } from '../services/api';
 
 export default {
   name: 'TodaySchedule',
   data() {
     return {
-      schedules: [],
-      medicines: [],
       todaysDoses: [],
       currentTime: new Date(),
       timeUpdateInterval: null,
-      takenDoses: {}
+      markingDose: false,
+      lastRefresh: null
     };
   },
   mounted() {
-    this.loadTakenDoses();
-    this.fetchSchedules();
-    this.fetchMedicines();
+    this.fetchTodaysDoses();
     this.startTimeUpdater();
+    this.requestNotificationPermission();
   },
   beforeUnmount() {
     if (this.timeUpdateInterval) {
@@ -105,94 +105,34 @@ export default {
       });
     },
 
-    refreshSchedule() {
-      this.fetchSchedules();
-      this.generateTodaysDoses();
+    async refreshSchedule() {
+      await this.fetchTodaysDoses();
+      this.$emit('dose-taken'); // Refresh stats
     },
 
-    // Local Storage Methods
-    loadTakenDoses() {
+    async fetchTodaysDoses() {
       try {
-        const stored = localStorage.getItem('medicine_taken_doses');
-        this.takenDoses = stored ? JSON.parse(stored) : {};
+        this.todaysDoses = await getTodaySchedules();
+        this.lastRefresh = new Date();
+        console.log('Fetched today\'s doses:', this.todaysDoses.length);
       } catch (error) {
-        console.error('Error loading taken doses:', error);
-        this.takenDoses = {};
+        console.error('Error fetching today\'s doses:', error);
+        this.showToast('Error loading doses', 'error');
       }
     },
 
-    saveTakenDoses() {
-      try {
-        localStorage.setItem('medicine_taken_doses', JSON.stringify(this.takenDoses));
-      } catch (error) {
-        console.error('Error saving taken doses:', error);
-      }
-    },
-
-    getDoseKey(scheduleId, time, date) {
-      return `${scheduleId}_${time}_${date}`;
-    },
-
-    async fetchSchedules() {
-      try {
-        const response = await getSchedules();
-        this.schedules = response;
-        this.generateTodaysDoses();
-      } catch (error) {
-        console.error('Error fetching schedules:', error);
-      }
-    },
-
-    async fetchMedicines() {
-      try {
-        const response = await getMedicines();
-        this.medicines = response;
-      } catch (error) {
-        console.error('Error fetching medicines:', error);
-      }
-    },
-
-    generateTodaysDoses() {
-      const today = new Date().toISOString().split('T')[0];
-      this.todaysDoses = [];
-
-      this.schedules.forEach(schedule => {
-        if (schedule.dailyTimes && this.isScheduleActiveToday(schedule, today)) {
-          schedule.dailyTimes.forEach(time => {
-            const taken = this.isDoseTaken(schedule._id, time, today);
-            const takenAt = this.getDoseTakenTime(schedule._id, time, today);
-
-            this.todaysDoses.push({
-              scheduleId: schedule._id,
-              time: time,
-              medicine: schedule.medicine,
-              dosageAmount: schedule.dosageAmount,
-              unit: schedule.unit,
-              taken: taken,
-              takenAt: takenAt
-            });
-          });
+    async requestNotificationPermission() {
+      if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+          const permission = await Notification.requestPermission();
+          console.log('Notification permission:', permission);
+          if (permission === 'granted') {
+            this.showToast('Notifications enabled! You\'ll get reminders for your medicines.', 'success');
+          }
         }
-      });
-
-      // Sort by time
-      this.todaysDoses.sort((a, b) => a.time.localeCompare(b.time));
-    },
-
-    isScheduleActiveToday(schedule, today) {
-      const startDate = new Date(schedule.startDate).toISOString().split('T')[0];
-      const endDate = new Date(schedule.endDate).toISOString().split('T')[0];
-      return today >= startDate && today <= endDate;
-    },
-
-    isDoseTaken(scheduleId, time, date) {
-      const key = this.getDoseKey(scheduleId, time, date);
-      return this.takenDoses[key]?.taken || false;
-    },
-
-    getDoseTakenTime(scheduleId, time, date) {
-      const key = this.getDoseKey(scheduleId, time, date);
-      return this.takenDoses[key]?.takenAt || null;
+      } else {
+        console.log('Notifications not supported');
+      }
     },
 
     isDoseReady(doseTime) {
@@ -200,7 +140,6 @@ export default {
       const [hours, minutes] = doseTime.split(':').map(Number);
       const doseDateTime = new Date();
       doseDateTime.setHours(hours, minutes, 0, 0);
-
       return now >= doseDateTime;
     },
 
@@ -255,43 +194,88 @@ export default {
     },
 
     async markAsTaken(dose) {
+      if (this.markingDose) return;
+
+      this.markingDose = true;
       try {
         const today = new Date().toISOString().split('T')[0];
-        const takenAt = new Date().toISOString();
 
-        // Save to local storage
-        const key = this.getDoseKey(dose.scheduleId, dose.time, today);
-        this.takenDoses[key] = {
-          taken: true,
-          takenAt: takenAt,
-          scheduleId: dose.scheduleId,
-          time: dose.time,
-          date: today
-        };
-        this.saveTakenDoses();
+        // Save to database
+        await markDoseAsTaken(dose.scheduleId, dose.time, today);
 
         // Update local state
         dose.taken = true;
-        dose.takenAt = takenAt;
+        dose.takenAt = new Date().toISOString();
 
-        // TODO: Save to database
-        // await saveDoseToDatabase(dose);
-
-        alert(`✓ ${dose.medicine?.name} marked as taken!`);
-
-        // Refresh the parent component stats
-        this.$emit('dose-taken');
+        this.showToast(`✓ ${dose.medicine?.name} marked as taken!`, 'success');
+        this.$emit('dose-taken'); // Refresh stats
 
       } catch (error) {
         console.error('Error marking dose as taken:', error);
-        alert('Error marking dose as taken');
+        this.showToast('Error saving dose. Please try again.', 'error');
+      } finally {
+        this.markingDose = false;
       }
+    },
+
+    async unmarkDose(dose) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+
+        // Remove from database
+        await unmarkDose(dose.scheduleId, dose.time, today);
+
+        // Update local state
+        dose.taken = false;
+        dose.takenAt = null;
+
+        this.showToast(`Dose unmarked for ${dose.medicine?.name}`, 'success');
+        this.$emit('dose-taken'); // Refresh stats
+
+      } catch (error) {
+        console.error('Error unmarking dose:', error);
+        this.showToast('Error unmarking dose. Please try again.', 'error');
+      }
+    },
+
+    showToast(message, type = 'success') {
+      // Simple toast implementation
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 400px;
+        background: ${type === 'success' ? '#10b981' : '#ef4444'};
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      `;
+
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => document.body.removeChild(toast), 300);
+      }, 3000);
     },
 
     startTimeUpdater() {
       this.timeUpdateInterval = setInterval(() => {
         this.currentTime = new Date();
-        // Force reactivity update
+
+        // Auto-refresh doses every 5 minutes
+        const now = new Date();
+        if (this.lastRefresh && (now - this.lastRefresh) > 5 * 60 * 1000) {
+          this.fetchTodaysDoses();
+        }
+
         this.$forceUpdate();
       }, 60000); // Update every minute
     }
@@ -300,6 +284,58 @@ export default {
 </script>
 
 <style scoped>
+/* ...existing styles... */
+
+.btn-unmark {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+  transition: background 0.2s;
+}
+
+.btn-unmark:hover {
+  background: #d97706;
+}
+
+.btn-take-dose:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.taken-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Toast animations */
+.toast {
+  animation: slideIn 0.3s ease;
+  transition: all 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Existing styles remain the same... */
 .todays-doses {
   margin-bottom: 2rem;
 }
@@ -475,15 +511,9 @@ export default {
   transition: all 0.3s ease;
 }
 
-.btn-take-dose:hover {
+.btn-take-dose:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.taken-info {
-  text-align: center;
-  color: #6b7280;
-  font-style: italic;
 }
 
 .no-doses {

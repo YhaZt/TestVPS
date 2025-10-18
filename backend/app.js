@@ -7,9 +7,10 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://scheduler.carpeldreams.me', // remove the slash
+  origin: ['https://scheduler.carpeldreams.me', 'http://localhost:5173', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
 
@@ -38,7 +39,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: 'Something went wrong!' });
 });
 
-// 404 handler (pathless to avoid path-to-regexp parsing issues)
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Route not found' });
 });

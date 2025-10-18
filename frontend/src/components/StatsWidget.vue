@@ -81,7 +81,7 @@ export default {
       try {
         const stored = localStorage.getItem('medicine_taken_doses');
         this.takenDoses = stored ? JSON.parse(stored) : {};
-      } catch (error) {
+      } catch {
         this.takenDoses = {};
       }
     },

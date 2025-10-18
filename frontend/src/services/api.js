@@ -22,8 +22,11 @@ export const createSchedule = (payload) => unwrap(api.post('/api/schedules', pay
 export const updateSchedule = (id, payload) => unwrap(api.put(`/api/schedules/${id}`, payload));
 export const deleteSchedule = (id) => unwrap(api.delete(`/api/schedules/${id}`));
 
-// Dose tracking
+// Dose tracking - save to database
 export const markDoseAsTaken = (scheduleId, time, date = null) =>
   unwrap(api.post(`/api/schedules/${scheduleId}/doses/mark`, { time, date }));
+
+export const unmarkDose = (scheduleId, time, date = null) =>
+  unwrap(api.post(`/api/schedules/${scheduleId}/doses/unmark`, { time, date }));
 
 export default api;
