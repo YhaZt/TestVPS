@@ -76,8 +76,8 @@
 </template>
 
 <script>
-import MedicineManager from './components/MedicineManager.vue';
-import ScheduleManager from './components/ScheduleManager.vue';
+import MedicineManager from './components/MedicineList.vue';
+import ScheduleManager from './components/ScheduleList.vue';
 import TodaySchedule from './components/TodaySchedule.vue';
 import StatsWidget from './components/StatsWidget.vue';
 import CalendarView from './components/CalendarView.vue';
