@@ -1,8 +1,14 @@
 <template>
   <div class="today-schedule">
-    <div class="header">
-      <h2>📅 Today's Doses - {{ currentDate }}</h2>
-      <button @click="refreshSchedules" class="btn-refresh">🔄 Refresh</button>
+    <div class="schedule-header">
+      <div class="header-content">
+        <h2 class="schedule-title">
+          📅 Today's Doses - {{ formatDate(new Date()) }}
+        </h2>
+        <button @click="refreshSchedule" class="refresh-btn">
+          🔄 Refresh
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">Loading...</div>
@@ -226,11 +232,21 @@ export default {
       } else {
         this.expandedDoses.push(key);
       }
+    },
+    formatDate(date) {
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    },
+    refreshSchedule() {
+      this.refreshSchedules();
     }
   }
 };
 </script>
-
 
 <style scoped>
 .btn-take {
@@ -264,21 +280,61 @@ export default {
   padding: 2rem;
 }
 
-.header {
+.schedule-header {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
 }
 
-.btn-refresh {
-  padding: 0.75rem 1.5rem;
-  background: #667eea;
+.schedule-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.refresh-btn {
+  padding: 0.5rem 1rem;
+  background: #6366f1;
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
+  font-size: 0.875rem;
+  transition: background 0.2s;
+}
+
+.refresh-btn:hover {
+  background: #5855eb;
+}
+
+@media (max-width: 768px) {
+  .schedule-header {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .schedule-title {
+    font-size: 1.1rem;
+  }
+
+  .refresh-btn {
+    width: 100%;
+    padding: 0.75rem;
+  }
 }
 
 .loading {

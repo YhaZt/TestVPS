@@ -46,8 +46,8 @@
         <div class="card-header">
           <h3>{{ medicine.name }}</h3>
           <div class="card-actions">
-            <button @click="editMedicine(medicine)" class="btn-icon">✏️</button>
-            <button @click="deleteMedicineConfirm(medicine._id)" class="btn-icon">🗑️</button>
+            <!-- <button @click="editMedicine(medicine)" class="btn-icon">✏️</button>
+            <button @click="deleteMedicineConfirm(medicine._id)" class="btn-icon">🗑️</button> -->
           </div>
         </div>
         <div class="card-body">

@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <header class="app-header">
-        <div class="container">
+      <div class="container">
         <div class="logo">
           <span class="logo-icon">🏥</span>
           <h1>Medicine Scheduler</h1>
@@ -21,6 +21,11 @@
 
     <main class="app-main">
       <div class="container">
+        <!-- Mobile Stats Widget (horizontal) - only show on today tab -->
+        <div v-if="activeTab === 'today'" class="mobile-stats-wrapper">
+          <StatsWidget />
+        </div>
+
         <div class="main-layout">
           <div class="content-area">
             <TodaySchedule v-if="activeTab === 'today'" />
@@ -28,13 +33,13 @@
             <ScheduleList v-if="activeTab === 'schedules'" />
           </div>
 
-          <aside class="sidebar">
+          <!-- Desktop Stats Widget (sidebar) -->
+          <aside class="desktop-sidebar">
             <StatsWidget />
           </aside>
         </div>
       </div>
     </main>
-
   </div>
 </template>
 
@@ -54,9 +59,9 @@ export default {
   },
   data() {
     return {
-      activeTab: 'today', // Changed from 'medicines' to 'today'
+      activeTab: 'today',
       tabs: [
-        { id: 'today', label: "Today's Doses" }, // Moved to first position
+        { id: 'today', label: "Today's Doses" },
         { id: 'medicines', label: 'Medicines' },
         { id: 'schedules', label: 'Schedules' }
       ]
@@ -81,35 +86,38 @@ body {
 .container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 1rem;
 }
 
 .app-header {
   background: white;
   border-bottom: 1px solid #e5e7eb;
-  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .app-header .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 1rem;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .logo-icon {
-  font-size: 2rem;
+  font-size: 1.5rem;
 }
 
 .logo h1 {
-  color: #6366f1;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
+  color: #1f2937;
 }
 
 .main-nav {
@@ -118,14 +126,19 @@ body {
 }
 
 .nav-button {
-  padding: 0.75rem 1.5rem;
-  border: 2px solid transparent;
-  border-radius: 8px;
-  background: transparent;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: #f3f4f6;
   color: #6b7280;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.nav-button:hover {
+  background: #e5e7eb;
 }
 
 .nav-button.active {
@@ -133,44 +146,81 @@ body {
   color: white;
 }
 
-.nav-button:hover:not(.active) {
-  background: #f3f4f6;
-  color: #374151;
+.app-main {
+  padding: 1rem 0;
+  min-height: calc(100vh - 80px);
 }
 
-.app-main {
-  padding: 2rem 0;
-  min-height: calc(100vh - 120px);
+/* Mobile Stats Widget */
+.mobile-stats-wrapper {
+  display: block;
+  margin-bottom: 1.5rem;
+}
+
+/* Desktop Sidebar */
+.desktop-sidebar {
+  display: none;
 }
 
 .main-layout {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr;
   gap: 2rem;
-  align-items: start;
 }
 
 .content-area {
-  min-height: 500px;
+  min-height: 400px;
 }
 
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
+/* Desktop Layout */
+@media (min-width: 1024px) {
+  .container {
+    padding: 0 2rem;
+  }
 
-@media (max-width: 1024px) {
+  .mobile-stats-wrapper {
+    display: none;
+  }
+
+  .desktop-sidebar {
+    display: block;
+  }
+
   .main-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 300px;
+  }
+}
+
+/* Mobile Navigation */
+@media (max-width: 768px) {
+  .app-header .container {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
   }
 
-  .sidebar {
-    order: -1;
+  .logo {
+    align-self: center;
   }
 
-  .stats-widget {
+  .main-nav {
     width: 100%;
+    justify-content: center;
+  }
+
+  .nav-button {
+    flex: 1;
+    text-align: center;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .logo h1 {
+    font-size: 1.1rem;
+  }
+
+  .logo-icon {
+    font-size: 1.3rem;
   }
 }
 </style>

@@ -1,25 +1,26 @@
 <template>
   <div class="stats-widget">
-    <h3>📊 Today's Overview</h3>
+    <h3 class="stats-title">📊 Today's Overview</h3>
+    <div class="stats-grid">
+      <div class="stat-card total">
+        <div class="stat-number">{{ totalTasks }}</div>
+        <div class="stat-label">Total Tasks</div>
+      </div>
 
-    <div class="stat-card">
-      <div class="stat-number">{{ totalTasks }}</div>
-      <div class="stat-label">Total Tasks</div>
-    </div>
+      <div class="stat-card completed">
+        <div class="stat-number">{{ completedTasks }}</div>
+        <div class="stat-label">Completed</div>
+      </div>
 
-    <div class="stat-card completed">
-      <div class="stat-number">{{ completedTasks }}</div>
-      <div class="stat-label">Completed</div>
-    </div>
+      <div class="stat-card pending">
+        <div class="stat-number">{{ pendingTasks }}</div>
+        <div class="stat-label">Pending</div>
+      </div>
 
-    <div class="stat-card pending">
-      <div class="stat-number">{{ pendingTasks }}</div>
-      <div class="stat-label">Pending</div>
-    </div>
-
-    <div class="stat-card overdue">
-      <div class="stat-number">{{ overdueTasks }}</div>
-      <div class="stat-label">Overdue</div>
+      <div class="stat-card overdue">
+        <div class="stat-number">{{ overdueTasks }}</div>
+        <div class="stat-label">Overdue</div>
+      </div>
     </div>
   </div>
 </template>
@@ -94,68 +95,110 @@ export default {
   background: white;
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  width: 280px;
-  position: sticky;
-  top: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.stats-widget h3 {
-  margin: 0 0 1.5rem 0;
-  color: #1f2937;
-  font-size: 1.1rem;
+.stats-title {
+  font-size: 1rem;
   font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
 }
 
 .stat-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  text-align: center;
   padding: 1rem;
-  margin-bottom: 1rem;
   border-radius: 8px;
-  background: #f8fafc;
-  border-left: 4px solid #6b7280;
+  background: #f9fafb;
+  border-left: 4px solid;
+}
+
+.stat-card.total {
+  border-left-color: #6366f1;
 }
 
 .stat-card.completed {
-  background: #f0f9ff;
   border-left-color: #10b981;
 }
 
 .stat-card.pending {
-  background: #fffbeb;
   border-left-color: #f59e0b;
 }
 
 .stat-card.overdue {
-  background: #fef2f2;
   border-left-color: #ef4444;
 }
 
 .stat-number {
-  font-size: 2rem;
-  font-weight: bold;
+  font-size: 1.5rem;
+  font-weight: 700;
   color: #1f2937;
-  line-height: 1;
-}
-
-.stat-card.completed .stat-number {
-  color: #10b981;
-}
-
-.stat-card.pending .stat-number {
-  color: #f59e0b;
-}
-
-.stat-card.overdue .stat-number {
-  color: #ef4444;
+  margin-bottom: 0.25rem;
 }
 
 .stat-label {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   color: #6b7280;
-  margin-top: 0.25rem;
   font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Mobile Layout */
+@media (max-width: 768px) {
+  .stats-widget {
+    padding: 1rem;
+    margin-bottom: 0;
+  }
+
+  .stats-title {
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  .stat-card {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .stat-number {
+    font-size: 1.25rem;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+  }
+}
+
+/* Desktop Layout */
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    padding: 1rem;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    margin-bottom: 0;
+  }
 }
 </style>

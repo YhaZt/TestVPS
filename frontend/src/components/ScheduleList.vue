@@ -2,7 +2,7 @@
   <div class="schedule-list">
     <div class="header">
       <h2>Medicine Schedules</h2>
-      <button @click="showAddForm = true" class="btn-add">+ Create Schedule</button>
+      <!-- <button @click="showAddForm = true" class="btn-add">+ Create Schedule</button> -->
     </div>
 
     <!-- Add/Edit Form -->
@@ -126,8 +126,8 @@
         <div class="card-header">
           <h3>{{ schedule.medicine?.name || 'Unknown Medicine' }}</h3>
           <div class="card-actions">
-            <button @click="editSchedule(schedule)" class="btn-icon">✏️</button>
-            <button @click="deleteScheduleConfirm(schedule._id)" class="btn-icon">🗑️</button>
+            <!-- <button @click="editSchedule(schedule)" class="btn-icon">✏️</button>
+            <button @click="deleteScheduleConfirm(schedule._id)" class="btn-icon">🗑️</button> -->
           </div>
         </div>
         <div class="card-body">
