@@ -37,7 +37,6 @@
           >
             📊 Stats
           </button>
-          <router-link to="/calendar" class="nav-link">Calendar</router-link>
         </nav>
       </div>
     </header>
@@ -70,7 +69,6 @@
           </aside>
         </div>
       </div>
-      <router-view />
     </main>
   </div>
 </template>

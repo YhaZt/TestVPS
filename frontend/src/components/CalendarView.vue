@@ -20,13 +20,25 @@
         @click="selectDate(day.date)"
       >
         <div class="date-num">{{ day.date.getDate() }}</div>
-        <div class="dots">
-          <span
-            v-for="n in (getDayCounts(day.date).total || 0)"
-            :key="n"
-            class="dot"
-            :class="{ done: n <= (getDayCounts(day.date).done || 0) }"
-          />
+
+        <!-- Show medicine times for this day -->
+        <div class="day-schedule">
+          <div
+            v-for="dose in getDayDoses(day.date).slice(0, 3)"
+            :key="`${dose.scheduleId}_${dose.time}`"
+            class="dose-time-pill"
+            :class="{ taken: dose.taken }"
+            @click.stop="openDoseModal(dose, day.date)"
+          >
+            {{ formatTimeShort(dose.time) }}
+          </div>
+          <div
+            v-if="getDayDoses(day.date).length > 3"
+            class="more-indicator"
+            @click.stop="selectDate(day.date)"
+          >
+            +{{ getDayDoses(day.date).length - 3 }}
+          </div>
         </div>
       </button>
     </div>
@@ -66,7 +78,7 @@
           <span>🎉 All doses completed for today!</span>
         </div>
         <div class="dose-list">
-          <div v-for="dose in upcomingDoses" :key="doseKeyForList(dose)" class="dose-row">
+          <div v-for="dose in upcomingDoses" :key="doseKeyForList(dose)" class="dose-row clickable" @click="openDoseModal(dose, selectedDate)">
             <div class="dose-info">
               <div class="medicine-name">{{ dose.medicine?.name || 'Medicine' }}</div>
               <div class="dose-details">
@@ -75,7 +87,7 @@
             </div>
             <button
               class="btn-secondary"
-              @click="markAsTaken(dose)"
+              @click.stop="markAsTaken(dose)"
               :disabled="isMarking"
             >
               {{ isMarking ? '⏳' : '✓ Done' }}
@@ -90,7 +102,7 @@
           ✅ Completed ({{ completedDoses.length }})
         </summary>
         <div class="dose-list compact">
-          <div v-for="dose in completedDoses" :key="doseKeyForList(dose)" class="dose-row completed">
+          <div v-for="dose in completedDoses" :key="doseKeyForList(dose)" class="dose-row completed clickable" @click="openDoseModal(dose, selectedDate)">
             <div class="dose-info">
               <div class="medicine-name completed">✓ {{ dose.medicine?.name || 'Medicine' }}</div>
               <div class="dose-details">
@@ -99,7 +111,7 @@
             </div>
             <button
               class="btn-undo"
-              @click="undoTaken(dose)"
+              @click.stop="undoTaken(dose)"
               :disabled="isMarking"
             >
               ↶ Undo
@@ -108,6 +120,80 @@
         </div>
       </details>
     </section>
+
+    <!-- Dose Detail Modal -->
+    <div v-if="showModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>💊 {{ selectedDose?.medicine?.name || 'Medicine Details' }}</h3>
+          <button class="modal-close" @click="closeModal">×</button>
+        </div>
+
+        <div class="modal-body" v-if="selectedDose">
+          <div class="detail-section">
+            <h4>📅 Schedule Information</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="label">Time:</span>
+                <span class="value">{{ formatTime(selectedDose.time) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Dosage:</span>
+                <span class="value">{{ selectedDose.dosageAmount }} {{ selectedDose.unit }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Date:</span>
+                <span class="value">{{ formatLongDate(modalDate) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Status:</span>
+                <span class="value" :class="{ taken: selectedDose.taken }">
+                  {{ selectedDose.taken ? '✅ Taken' : '⏰ Pending' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="selectedDose.taken" class="detail-section">
+            <h4>✅ Completion Details</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="label">Taken at:</span>
+                <span class="value">{{ formatTime(selectedDose.takenAt) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="selectedDose.medicine" class="detail-section">
+            <h4>💊 Medicine Information</h4>
+            <div class="detail-grid">
+              <div class="detail-item" v-if="selectedDose.medicine.description">
+                <span class="label">Description:</span>
+                <span class="value">{{ selectedDose.medicine.description }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedDose.medicine.requiresFood">
+                <span class="label">Instructions:</span>
+                <span class="value food-requirement">🍽️ Take with food</span>
+              </div>
+              <div class="detail-item" v-if="selectedDose.medicine.mustAvoid">
+                <span class="label">Avoid:</span>
+                <span class="value warning">⚠️ {{ selectedDose.medicine.mustAvoid }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button v-if="!selectedDose?.taken" class="btn-modal-primary" @click="markAsTakenFromModal">
+            ✓ Mark as Taken
+          </button>
+          <button v-else class="btn-modal-secondary" @click="undoTakenFromModal">
+            ↶ Undo Taken
+          </button>
+          <button class="btn-modal-cancel" @click="closeModal">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -125,7 +211,10 @@ export default {
       selectedDate: today,
       dayDoses: [],
       takenDoses: {},
-      isMarking: false
+      isMarking: false,
+      showModal: false,
+      selectedDose: null,
+      modalDate: null
     };
   },
   computed: {
@@ -164,7 +253,6 @@ export default {
 
       if (!isToday) return sorted[0];
 
-      // If today, find next upcoming dose or earliest
       const afterNow = sorted.find(d => this.timeToDate(d.time, this.selectedDate) >= now);
       return afterNow || sorted[0];
     },
@@ -172,7 +260,6 @@ export default {
       const list = this.dayDoses.filter(d => !d.taken)
         .sort((a, b) => a.time.localeCompare(b.time));
 
-      // Filter out nextDose to avoid duplication
       if (this.nextDose) {
         return list.filter(d => !(d.scheduleId === this.nextDose.scheduleId && d.time === this.nextDose.time));
       }
@@ -212,20 +299,37 @@ export default {
       this.selectedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     },
 
-    // Data management
-    async fetchSchedules() {
-      try {
-        this.schedules = await getSchedules();
-      } catch (e) {
-        console.error('Failed to load schedules', e);
+    // Modal methods
+    openDoseModal(dose, date) {
+      this.selectedDose = { ...dose };
+      this.modalDate = new Date(date);
+      this.showModal = true;
+    },
+    closeModal() {
+      this.showModal = false;
+      this.selectedDose = null;
+      this.modalDate = null;
+    },
+    async markAsTakenFromModal() {
+      if (this.selectedDose) {
+        await this.markAsTaken(this.selectedDose);
+        this.closeModal();
       }
     },
-    rebuildDayDoses() {
-      const isoDate = this.toISODate(this.selectedDate);
+    async undoTakenFromModal() {
+      if (this.selectedDose) {
+        await this.undoTaken(this.selectedDose);
+        this.closeModal();
+      }
+    },
+
+    // Get doses for a specific day (for calendar grid)
+    getDayDoses(dateObj) {
+      const isoDate = this.toISODate(dateObj);
       const list = [];
 
       this.schedules.forEach(s => {
-        if (!s?.dailyTimes || !this.isActiveOnDate(s, this.selectedDate)) return;
+        if (!s?.dailyTimes || !this.isActiveOnDate(s, dateObj)) return;
 
         s.dailyTimes.forEach(t => {
           const key = this.doseKey(s._id, t, isoDate);
@@ -244,7 +348,19 @@ export default {
         });
       });
 
-      this.dayDoses = list.sort((a, b) => a.time.localeCompare(b.time));
+      return list.sort((a, b) => a.time.localeCompare(b.time));
+    },
+
+    // Data management
+    async fetchSchedules() {
+      try {
+        this.schedules = await getSchedules();
+      } catch (e) {
+        console.error('Failed to load schedules', e);
+      }
+    },
+    rebuildDayDoses() {
+      this.dayDoses = this.getDayDoses(this.selectedDate);
     },
 
     // Dose management
@@ -271,7 +387,6 @@ export default {
         const key = this.doseKey(dose.scheduleId, dose.time, dose.date);
         const nowIso = new Date().toISOString();
 
-        // TODO: Replace with backend API call
         this.takenDoses[key] = {
           taken: true,
           takenAt: nowIso,
@@ -299,7 +414,6 @@ export default {
       try {
         const key = this.doseKey(dose.scheduleId, dose.time, dose.date);
 
-        // TODO: Replace with backend API call
         delete this.takenDoses[key];
 
         this.saveTakenDosesLocal();
@@ -316,22 +430,6 @@ export default {
     },
 
     // Helper methods
-    getDayCounts(dateObj) {
-      const iso = this.toISODate(dateObj);
-      let total = 0;
-      let done = 0;
-
-      this.schedules.forEach(s => {
-        if (!s?.dailyTimes || !this.isActiveOnDate(s, dateObj)) return;
-        total += s.dailyTimes.length;
-        s.dailyTimes.forEach(t => {
-          const key = this.doseKey(s._id, t, iso);
-          if (this.takenDoses[key]?.taken) done++;
-        });
-      });
-
-      return { total, done };
-    },
     isActiveOnDate(schedule, dateObj) {
       const iso = this.toISODate(dateObj);
       const start = schedule.startDate ? this.toISODate(new Date(schedule.startDate)) : null;
@@ -382,6 +480,14 @@ export default {
       const ampm = h >= 12 ? 'PM' : 'AM';
       return `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
     },
+    formatTimeShort(time) {
+      if (!time) return '';
+
+      const [h] = time.split(':').map(Number);
+      const hr = h % 12 || 12;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${hr}${ampm}`;
+    },
     doseKey(scheduleId, time, date) {
       return `${scheduleId}_${time}_${date}`;
     },
@@ -420,6 +526,236 @@ export default {
 </script>
 
 <style scoped>
+/* ... keep existing styles and add these new ones ... */
+
+.day-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.dose-time-pill {
+  background: #6366f1;
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dose-time-pill:hover {
+  background: #5855eb;
+  transform: scale(1.05);
+}
+
+.dose-time-pill.taken {
+  background: #10b981;
+}
+
+.more-indicator {
+  background: #f59e0b;
+  color: white;
+  font-size: 9px;
+  padding: 1px 3px;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.clickable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.clickable:hover {
+  background: #f1f5f9;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #374151;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.detail-section {
+  margin-bottom: 1.5rem;
+}
+
+.detail-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.label {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.value {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.value.taken {
+  color: #10b981;
+}
+
+.value.food-requirement {
+  color: #f59e0b;
+}
+
+.value.warning {
+  color: #dc2626;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 0 0 12px 12px;
+}
+
+.btn-modal-primary {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-modal-secondary {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-secondary:hover {
+  background: #d97706;
+}
+
+.btn-modal-cancel {
+  background: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-cancel:hover {
+  background: #555b6e;
+}
+
+/* Mobile modal */
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 12px 12px 0 0;
+    max-height: 95vh;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .btn-modal-primary,
+  .btn-modal-secondary,
+  .btn-modal-cancel {
+    width: 100%;
+  }
+}
+
+/* ... rest of existing styles ... */
 .calendar-page {
   display: grid;
   gap: 1.5rem;
@@ -483,7 +819,7 @@ export default {
 }
 
 .day-cell {
-  min-height: 70px;
+  min-height: 80px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -491,8 +827,6 @@ export default {
   text-align: left;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -521,23 +855,7 @@ export default {
   font-weight: 700;
   color: #374151;
   font-size: 0.875rem;
-}
-
-.dots {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  background: #cbd5e1;
-  border-radius: 50%;
-}
-
-.dot.done {
-  background: #10b981;
+  margin-bottom: 4px;
 }
 
 .day-details {
@@ -736,7 +1054,7 @@ export default {
   }
 
   .day-cell {
-    min-height: 60px;
+    min-height: 70px;
     padding: 6px;
   }
 

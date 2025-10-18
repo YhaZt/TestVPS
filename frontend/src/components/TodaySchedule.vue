@@ -13,17 +13,49 @@
         </div>
       </div>
 
-      <div class="dose-timeline">
+      <!-- Next dose pinned on top -->
+      <div v-if="nextDose" class="next-dose-card">
+        <div class="card-header">
+          <span class="next-badge">🔥 Next Dose</span>
+        </div>
+        <div class="dose-row">
+          <div class="dose-info">
+            <div class="medicine-name">{{ nextDose.medicine?.name || 'Medicine' }}</div>
+            <div class="dose-details">
+              <strong>{{ formatTime(nextDose.time) }}</strong>
+              <span> • {{ nextDose.dosageAmount }} {{ nextDose.unit }}</span>
+            </div>
+            <div v-if="!nextDose.taken" class="time-info">
+              <span v-if="isDoseReady(nextDose.time)" class="time-ready">⏰ Time to take!</span>
+              <span v-else class="time-countdown">⏱️ {{ getTimeUntilDose(nextDose.time) }}</span>
+            </div>
+          </div>
+          <button
+            v-if="!nextDose.taken"
+            @click="markAsTaken(nextDose)"
+            class="btn-take-dose"
+            :disabled="markingDose"
+          >
+            {{ markingDose ? '⏳ Saving...' : '✓ Mark as Taken' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Upcoming doses -->
+      <div class="upcoming-section">
+        <h3 class="section-title">⏰ Upcoming ({{ upcomingDoses.length }})</h3>
+        <div v-if="upcomingDoses.length === 0" class="no-doses">
+          <p>🎉 All upcoming doses completed!</p>
+        </div>
         <div
-          v-for="dose in todaysDoses"
+          v-for="dose in upcomingDoses"
           :key="`${dose.scheduleId}_${dose.time}`"
           :class="['dose-card', getDoseStatus(dose)]"
         >
           <div class="dose-header">
             <div class="dose-time">{{ formatTime(dose.time) }}</div>
             <div class="dose-status">
-              <span v-if="dose.taken" class="status-badge taken">✓ Taken</span>
-              <span v-else-if="isDoseReady(dose.time)" class="status-badge ready">🔔 Ready</span>
+              <span v-if="isDoseReady(dose.time)" class="status-badge ready">🔔 Ready</span>
               <span v-else class="status-badge scheduled">📅 Scheduled</span>
             </div>
           </div>
@@ -32,59 +64,65 @@
             <h4>{{ dose.medicine?.name || 'Unknown Medicine' }}</h4>
             <p class="dosage">💊 {{ dose.dosageAmount }} {{ dose.unit }}</p>
 
-            <!-- Time until dose -->
-            <div v-if="!dose.taken" class="time-info">
+            <div class="time-info">
               <span v-if="isDoseReady(dose.time)" class="time-ready">⏰ Time to take!</span>
               <span v-else class="time-countdown">⏱️ {{ getTimeUntilDose(dose.time) }}</span>
             </div>
 
-            <!-- Medicine info -->
             <div v-if="dose.medicine?.requiresFood || dose.medicine?.mustAvoid" class="medicine-alerts">
               <p v-if="dose.medicine?.requiresFood" class="food-alert">🍽️ Take with food</p>
               <p v-if="dose.medicine?.mustAvoid" class="avoid-alert">⚠️ Avoid: {{ dose.medicine.mustAvoid }}</p>
             </div>
           </div>
 
-          <!-- Action button - only show if time is ready and not taken -->
           <div class="dose-actions">
             <button
-              v-if="isDoseReady(dose.time) && !dose.taken"
+              v-if="isDoseReady(dose.time)"
               @click="markAsTaken(dose)"
               class="btn-take-dose"
               :disabled="markingDose"
             >
               {{ markingDose ? '⏳ Saving...' : '✓ Mark as Taken' }}
             </button>
-            <div v-else-if="dose.taken" class="taken-info">
-              <span class="taken-time">✓ Taken at {{ formatTime(dose.takenAt) }}</span>
-              <button @click="unmarkDose(dose)" class="btn-unmark">↶ Undo</button>
-            </div>
           </div>
         </div>
       </div>
 
-      <div v-if="todaysDoses.length === 0" class="no-doses">
-        <p>📋 No doses scheduled for today</p>
-        <p>Go to <strong>Schedules</strong> tab to create medicine schedules</p>
-      </div>
+      <!-- Completed doses - minimized at bottom -->
+      <details class="completed-section">
+        <summary class="section-summary">
+          <span class="section-title">✅ Completed Today ({{ completedDoses.length }})</span>
+          <span class="toggle-icon">▼</span>
+        </summary>
+        <div class="completed-doses">
+          <div
+            v-for="dose in completedDoses"
+            :key="`${dose.scheduleId}_${dose.time}_completed`"
+            class="dose-card completed"
+          >
+            <div class="dose-header">
+              <div class="dose-time">{{ formatTime(dose.time) }}</div>
+              <div class="dose-status">
+                <span class="status-badge taken">✓ Taken</span>
+              </div>
+            </div>
+
+            <div class="dose-content">
+              <h4>{{ dose.medicine?.name || 'Unknown Medicine' }}</h4>
+              <p class="dosage">💊 {{ dose.dosageAmount }} {{ dose.unit }}</p>
+              <div class="taken-info">
+                <span class="taken-time">✓ Taken at {{ formatTime(dose.takenAt) }}</span>
+              </div>
+            </div>
+
+            <div class="dose-actions">
+              <button @click="unmarkDose(dose)" class="btn-unmark">↶ Undo</button>
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
   </div>
-
-  <section>
-    <div v-if="nextDose" class="next-dose-card">
-      <!-- show nextDose summary with a small Done button -->
-    </div>
-
-    <div class="card">
-      <div class="card-title">Upcoming</div>
-      <!-- render not-taken doses except nextDose, ascending -->
-    </div>
-
-    <details class="card">
-      <summary class="card-title">Completed ({{ completed.length }})</summary>
-      <!-- render taken doses -->
-    </details>
-  </section>
 </template>
 
 <script>
@@ -92,6 +130,7 @@ import { getTodaySchedules, markDoseAsTaken, unmarkDose } from '../services/api'
 
 export default {
   name: 'TodaySchedule',
+  emits: ['dose-taken'],
   data() {
     return {
       todaysDoses: [],
@@ -100,6 +139,34 @@ export default {
       markingDose: false,
       lastRefresh: null
     };
+  },
+  computed: {
+    nextDose() {
+      const pending = this.todaysDoses.filter(d => !d.taken);
+      if (pending.length === 0) return null;
+
+      const sorted = pending.sort((a, b) => a.time.localeCompare(b.time));
+
+      // Find the next dose that's ready or the earliest upcoming
+      const readyDose = sorted.find(d => this.isDoseReady(d.time));
+      return readyDose || sorted[0];
+    },
+    upcomingDoses() {
+      const pending = this.todaysDoses.filter(d => !d.taken)
+        .sort((a, b) => a.time.localeCompare(b.time));
+
+      // Filter out nextDose to avoid duplication
+      if (this.nextDose) {
+        return pending.filter(d =>
+          !(d.scheduleId === this.nextDose.scheduleId && d.time === this.nextDose.time)
+        );
+      }
+      return pending;
+    },
+    completedDoses() {
+      return this.todaysDoses.filter(d => d.taken)
+        .sort((a, b) => a.time.localeCompare(b.time));
+    }
   },
   mounted() {
     this.fetchTodaysDoses();
@@ -123,7 +190,7 @@ export default {
 
     async refreshSchedule() {
       await this.fetchTodaysDoses();
-      this.$emit('dose-taken'); // Refresh stats
+      this.$emit('dose-taken');
     },
 
     async fetchTodaysDoses() {
@@ -138,16 +205,11 @@ export default {
     },
 
     async requestNotificationPermission() {
-      if ('Notification' in window) {
-        if (Notification.permission === 'default') {
-          const permission = await Notification.requestPermission();
-          console.log('Notification permission:', permission);
-          if (permission === 'granted') {
-            this.showToast('Notifications enabled! You\'ll get reminders for your medicines.', 'success');
-          }
+      if ('Notification' in window && Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          this.showToast('Notifications enabled!', 'success');
         }
-      } else {
-        console.log('Notifications not supported');
       }
     },
 
@@ -171,9 +233,7 @@ export default {
       const doseDateTime = new Date();
       doseDateTime.setHours(hours, minutes, 0, 0);
 
-      if (doseDateTime <= now) {
-        return 'Now';
-      }
+      if (doseDateTime <= now) return 'Now';
 
       const diffMs = doseDateTime - now;
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -189,7 +249,6 @@ export default {
     formatTime(time) {
       if (!time) return '';
 
-      // Handle ISO string format
       if (time.includes('T')) {
         return new Date(time).toLocaleTimeString('en-US', {
           hour: 'numeric',
@@ -198,7 +257,6 @@ export default {
         });
       }
 
-      // Handle HH:MM format
       if (time.includes(':')) {
         const [hours, minutes] = time.split(':').map(Number);
         const displayHour = hours % 12 || 12;
@@ -216,15 +274,13 @@ export default {
       try {
         const today = new Date().toISOString().split('T')[0];
 
-        // Save to database
         await markDoseAsTaken(dose.scheduleId, dose.time, today);
 
-        // Update local state
         dose.taken = true;
         dose.takenAt = new Date().toISOString();
 
         this.showToast(`✓ ${dose.medicine?.name} marked as taken!`, 'success');
-        this.$emit('dose-taken'); // Refresh stats
+        this.$emit('dose-taken');
 
       } catch (error) {
         console.error('Error marking dose as taken:', error);
@@ -238,15 +294,13 @@ export default {
       try {
         const today = new Date().toISOString().split('T')[0];
 
-        // Remove from database
         await unmarkDose(dose.scheduleId, dose.time, today);
 
-        // Update local state
         dose.taken = false;
         dose.takenAt = null;
 
         this.showToast(`Dose unmarked for ${dose.medicine?.name}`, 'success');
-        this.$emit('dose-taken'); // Refresh stats
+        this.$emit('dose-taken');
 
       } catch (error) {
         console.error('Error unmarking dose:', error);
@@ -255,7 +309,6 @@ export default {
     },
 
     showToast(message, type = 'success') {
-      // Simple toast implementation
       const toast = document.createElement('div');
       toast.className = `toast toast-${type}`;
       toast.textContent = message;
@@ -286,81 +339,19 @@ export default {
       this.timeUpdateInterval = setInterval(() => {
         this.currentTime = new Date();
 
-        // Auto-refresh doses every 5 minutes
-        if (this.lastRefresh && (this.currentTime - this.lastRefresh) > 5 * 60 * 1000) {
+        const now = new Date();
+        if (this.lastRefresh && (now - this.lastRefresh) > 5 * 60 * 1000) {
           this.fetchTodaysDoses();
         }
 
         this.$forceUpdate();
-      }, 60000); // Update every minute
-    }
-  },
-  computed: {
-    nextDose() {
-      const pending = this.todaysDoses.filter(d => !d.taken).sort((a,b)=>a.time.localeCompare(b.time));
-      const after = pending.find(d => this.isDoseReady(d.time));
-      return after || pending[0] || null;
-    },
-    completed() {
-      return this.todaysDoses.filter(d => d.taken).sort((a,b)=>a.time.localeCompare(b.time));
+      }, 60000);
     }
   }
 };
 </script>
 
 <style scoped>
-/* ...existing styles... */
-
-.btn-unmark {
-  background: #f59e0b;
-  color: white;
-  border: none;
-  padding: 0.25rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  margin-left: 0.5rem;
-  transition: background 0.2s;
-}
-
-.btn-unmark:hover {
-  background: #d97706;
-}
-
-.btn-take-dose:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.taken-info {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  text-align: center;
-  color: #6b7280;
-  font-style: italic;
-}
-
-/* Toast animations */
-.toast {
-  animation: slideIn 0.3s ease;
-  transition: all 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-/* Existing styles remain the same... */
 .todays-doses {
   margin-bottom: 2rem;
 }
@@ -400,17 +391,82 @@ export default {
   background: #5855eb;
 }
 
-.dose-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+/* Next dose card */
+.next-dose-card {
+  border: 2px solid #10b981;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
+.card-header {
+  margin-bottom: 0.75rem;
+}
+
+.next-badge {
+  background: #10b981;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Sections */
+.upcoming-section,
+.completed-section {
+  margin-bottom: 1.5rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.section-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+}
+
+.section-summary:hover {
+  background: #f9fafb;
+}
+
+.toggle-icon {
+  transition: transform 0.2s;
+}
+
+.completed-section[open] .toggle-icon {
+  transform: rotate(180deg);
+}
+
+.completed-doses {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Dose cards */
 .dose-card {
   background: white;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   padding: 1.5rem;
+  margin-bottom: 1rem;
   transition: all 0.3s ease;
 }
 
@@ -420,7 +476,8 @@ export default {
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
 }
 
-.dose-card.taken {
+.dose-card.taken,
+.dose-card.completed {
   border-color: #10b981;
   background: #f0fdf4;
   opacity: 0.8;
@@ -429,6 +486,29 @@ export default {
 .dose-card.scheduled {
   border-color: #6b7280;
   background: #f9fafb;
+}
+
+.dose-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dose-info {
+  flex: 1;
+}
+
+.medicine-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 1.125rem;
+}
+
+.dose-details {
+  color: #6b7280;
+  margin-bottom: 0.5rem;
 }
 
 .dose-header {
@@ -541,6 +621,33 @@ export default {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
+.btn-take-dose:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-unmark {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-unmark:hover {
+  background: #d97706;
+}
+
+.taken-info {
+  color: #6b7280;
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
 .no-doses {
   background: white;
   border: 2px dashed #d1d5db;
@@ -548,10 +655,6 @@ export default {
   padding: 2rem;
   text-align: center;
   color: #6b7280;
-}
-
-.no-doses p {
-  margin-bottom: 0.5rem;
 }
 
 /* Mobile responsive */
@@ -578,6 +681,12 @@ export default {
 
   .dose-card {
     padding: 1rem;
+  }
+
+  .dose-row {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
   }
 
   .dose-header {
