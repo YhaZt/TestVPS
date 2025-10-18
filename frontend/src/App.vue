@@ -23,19 +23,22 @@
       <div class="container">
         <!-- Mobile Stats Widget (horizontal) - only show on today tab -->
         <div v-if="activeTab === 'today'" class="mobile-stats-wrapper">
-          <StatsWidget />
+          <StatsWidget ref="mobileStats" />
         </div>
 
         <div class="main-layout">
           <div class="content-area">
-            <TodaySchedule v-if="activeTab === 'today'" />
+            <TodaySchedule
+              v-if="activeTab === 'today'"
+              @dose-taken="refreshStats"
+            />
             <MedicineList v-if="activeTab === 'medicines'" />
-            <ScheduleList v-if="activeTab === 'schedules'" />
+            <ScheduleList v-if="activeTab === 'schedules'" @schedule-updated="refreshStats" />
           </div>
 
           <!-- Desktop Stats Widget (sidebar) -->
           <aside class="desktop-sidebar">
-            <StatsWidget />
+            <StatsWidget ref="desktopStats" />
           </aside>
         </div>
       </div>
@@ -66,6 +69,17 @@ export default {
         { id: 'schedules', label: 'Schedules' }
       ]
     };
+  },
+  methods: {
+    refreshStats() {
+      // Refresh both mobile and desktop stats
+      if (this.$refs.mobileStats) {
+        this.$refs.mobileStats.refresh();
+      }
+      if (this.$refs.desktopStats) {
+        this.$refs.desktopStats.refresh();
+      }
+    }
   }
 };
 </script>

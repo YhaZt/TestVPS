@@ -3,22 +3,22 @@
     <h3 class="stats-title">📊 Today's Overview</h3>
     <div class="stats-grid">
       <div class="stat-card total">
-        <div class="stat-number">{{ totalTasks }}</div>
+        <div class="stat-number">{{ stats.total }}</div>
         <div class="stat-label">Total Tasks</div>
       </div>
 
       <div class="stat-card completed">
-        <div class="stat-number">{{ completedTasks }}</div>
+        <div class="stat-number">{{ stats.completed }}</div>
         <div class="stat-label">Completed</div>
       </div>
 
       <div class="stat-card pending">
-        <div class="stat-number">{{ pendingTasks }}</div>
+        <div class="stat-number">{{ stats.pending }}</div>
         <div class="stat-label">Pending</div>
       </div>
 
       <div class="stat-card overdue">
-        <div class="stat-number">{{ overdueTasks }}</div>
+        <div class="stat-number">{{ stats.overdue }}</div>
         <div class="stat-label">Overdue</div>
       </div>
     </div>
@@ -26,65 +26,89 @@
 </template>
 
 <script>
-import { getTodaySchedules } from '@/services/api';
+import { getSchedules } from '../services/api';
 
 export default {
   name: 'StatsWidget',
   data() {
     return {
-      todayDoses: []
+      schedules: [],
+      takenDoses: {}
     };
   },
   computed: {
-    totalTasks() {
-      return this.todayDoses.length;
-    },
-    completedTasks() {
-      return this.todayDoses.filter(dose => dose.taken).length;
-    },
-    pendingTasks() {
+    stats() {
+      const today = new Date().toISOString().split('T')[0];
       const now = new Date();
-      return this.todayDoses.filter(dose => {
-        if (dose.taken) return false;
-        const doseTime = this.parseDoseTime(dose);
-        return doseTime > now;
-      }).length;
-    },
-    overdueTasks() {
-      const now = new Date();
-      return this.todayDoses.filter(dose => {
-        if (dose.taken) return false;
-        const doseTime = this.parseDoseTime(dose);
-        return doseTime <= now;
-      }).length;
+
+      let total = 0;
+      let completed = 0;
+      let pending = 0;
+      let overdue = 0;
+
+      this.schedules.forEach(schedule => {
+        if (schedule.dailyTimes && this.isScheduleActiveToday(schedule, today)) {
+          schedule.dailyTimes.forEach(time => {
+            total++;
+
+            const taken = this.isDoseTaken(schedule._id, time, today);
+            if (taken) {
+              completed++;
+            } else {
+              const [hours, minutes] = time.split(':').map(Number);
+              const doseDateTime = new Date();
+              doseDateTime.setHours(hours, minutes, 0, 0);
+
+              if (now > doseDateTime) {
+                overdue++;
+              } else {
+                pending++;
+              }
+            }
+          });
+        }
+      });
+
+      return { total, completed, pending, overdue };
     }
   },
-  async mounted() {
-    await this.loadStats();
-    // Refresh every 30 seconds
-    this.interval = setInterval(() => {
-      this.loadStats();
-    }, 30000);
-  },
-  beforeUnmount() {
-    if (this.interval) {
-      clearInterval(this.interval);
-    }
+  mounted() {
+    this.loadTakenDoses();
+    this.fetchSchedules();
   },
   methods: {
-    async loadStats() {
+    loadTakenDoses() {
       try {
-        const doses = await getTodaySchedules();
-        this.todayDoses = Array.isArray(doses) ? doses : [];
-      } catch (e) {
-        console.error('Failed to load stats:', e);
+        const stored = localStorage.getItem('medicine_taken_doses');
+        this.takenDoses = stored ? JSON.parse(stored) : {};
+      } catch (error) {
+        this.takenDoses = {};
       }
     },
-    parseDoseTime(dose) {
-      if (!dose.time) return new Date();
-      const today = new Date();
-      const [hours, minutes] = dose.time.split(':');
-      return new Date(today.getFullYear(), today.getMonth(), today.getDate(), parseInt(hours), parseInt(minutes));
+
+    async fetchSchedules() {
+      try {
+        const response = await getSchedules();
+        this.schedules = response;
+      } catch (error) {
+        console.error('Error fetching schedules for stats:', error);
+      }
+    },
+
+    isScheduleActiveToday(schedule, today) {
+      const startDate = new Date(schedule.startDate).toISOString().split('T')[0];
+      const endDate = new Date(schedule.endDate).toISOString().split('T')[0];
+      return today >= startDate && today <= endDate;
+    },
+
+    isDoseTaken(scheduleId, time, date) {
+      const key = `${scheduleId}_${time}_${date}`;
+      return this.takenDoses[key]?.taken || false;
+    },
+
+    refresh() {
+      this.loadTakenDoses();
+      this.fetchSchedules();
     }
   }
 };

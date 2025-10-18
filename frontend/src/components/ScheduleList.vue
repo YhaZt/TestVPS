@@ -5,58 +5,7 @@
       <button @click="showAddForm = true" class="btn-add">+ Create Schedule</button>
     </div>
 
-    <!-- Today's Doses Section -->
-    <div class="todays-doses">
-      <h3>🕐 Today's Doses</h3>
-      <div class="dose-timeline">
-        <div
-          v-for="dose in todaysDoses"
-          :key="`${dose.scheduleId}_${dose.time}`"
-          :class="['dose-card', getDoseStatus(dose)]"
-        >
-          <div class="dose-header">
-            <div class="dose-time">{{ formatTime(dose.time) }}</div>
-            <div class="dose-status">
-              <span v-if="dose.taken" class="status-badge taken">✓ Taken</span>
-              <span v-else-if="isDoseReady(dose.time)" class="status-badge ready">🔔 Ready</span>
-              <span v-else class="status-badge scheduled">📅 Scheduled</span>
-            </div>
-          </div>
-
-          <div class="dose-content">
-            <h4>{{ dose.medicine?.name || 'Unknown Medicine' }}</h4>
-            <p class="dosage">💊 {{ dose.dosageAmount }} {{ dose.unit }}</p>
-
-            <!-- Time until dose -->
-            <div v-if="!dose.taken" class="time-info">
-              <span v-if="isDoseReady(dose.time)" class="time-ready">⏰ Time to take!</span>
-              <span v-else class="time-countdown">⏱️ {{ getTimeUntilDose(dose.time) }}</span>
-            </div>
-
-            <!-- Medicine info -->
-            <div v-if="dose.medicine?.requiresFood || dose.medicine?.mustAvoid" class="medicine-alerts">
-              <p v-if="dose.medicine?.requiresFood" class="food-alert">🍽️ Take with food</p>
-              <p v-if="dose.medicine?.mustAvoid" class="avoid-alert">⚠️ Avoid: {{ dose.medicine.mustAvoid }}</p>
-            </div>
-          </div>
-
-          <!-- Action button - only show if time is ready and not taken -->
-          <div class="dose-actions">
-            <button
-              v-if="isDoseReady(dose.time) && !dose.taken"
-              @click="markAsTaken(dose)"
-              class="btn-take-dose"
-            >
-              ✓ Mark as Taken
-            </button>
-            <div v-else-if="dose.taken" class="taken-info">
-              <span class="taken-time">Taken at {{ dose.takenAt ? formatTime(dose.takenAt) : 'Unknown' }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <!-- Schedule Management Section -->
     <!-- Add/Edit Form -->
     <div v-if="showAddForm || editingSchedule" class="modal">
       <div class="modal-content">
@@ -203,16 +152,11 @@ export default {
     return {
       schedules: [],
       medicines: [],
-      todaysDoses: [],
       showAddForm: false,
       editingSchedule: null,
       form: this.getEmptyForm(),
       calculatedEndDate: '',
-      selectedMedicine: null,
-      currentTime: new Date(),
-      timeUpdateInterval: null,
-      notificationPermission: 'default',
-      takenDoses: {} // Store taken doses locally
+      selectedMedicine: null
     };
   },
   computed: {
@@ -227,17 +171,8 @@ export default {
     }
   },
   mounted() {
-    this.loadTakenDoses();
     this.fetchSchedules();
     this.fetchMedicines();
-    this.requestNotificationPermission();
-    this.startTimeUpdater();
-    this.setupNotificationScheduler();
-  },
-  beforeUnmount() {
-    if (this.timeUpdateInterval) {
-      clearInterval(this.timeUpdateInterval);
-    }
   },
   methods: {
     getEmptyForm() {
@@ -253,56 +188,10 @@ export default {
       };
     },
 
-    // Local Storage Methods for Dose Tracking
-    loadTakenDoses() {
-      try {
-        const stored = localStorage.getItem('medicine_taken_doses');
-        this.takenDoses = stored ? JSON.parse(stored) : {};
-      } catch (error) {
-        console.error('Error loading taken doses:', error);
-        this.takenDoses = {};
-      }
-    },
-
-    saveTakenDoses() {
-      try {
-        localStorage.setItem('medicine_taken_doses', JSON.stringify(this.takenDoses));
-      } catch (error) {
-        console.error('Error saving taken doses:', error);
-      }
-    },
-
-    getDoseKey(scheduleId, time, date) {
-      return `${scheduleId}_${time}_${date}`;
-    },
-
-    markDoseAsTaken(scheduleId, time, date, takenAt) {
-      const key = this.getDoseKey(scheduleId, time, date);
-      this.takenDoses[key] = {
-        taken: true,
-        takenAt: takenAt || new Date().toISOString(),
-        scheduleId,
-        time,
-        date
-      };
-      this.saveTakenDoses();
-    },
-
-    isDoseTaken(scheduleId, time, date) {
-      const key = this.getDoseKey(scheduleId, time, date);
-      return this.takenDoses[key]?.taken || false;
-    },
-
-    getDoseTakenTime(scheduleId, time, date) {
-      const key = this.getDoseKey(scheduleId, time, date);
-      return this.takenDoses[key]?.takenAt || null;
-    },
-
     async fetchSchedules() {
       try {
         const response = await getSchedules();
         this.schedules = response;
-        this.generateTodaysDoses();
       } catch (error) {
         alert('Error fetching schedules: ' + error.message);
       }
@@ -394,233 +283,6 @@ export default {
 
     formatDate(date) {
       return new Date(date).toLocaleDateString();
-    },
-
-    generateTodaysDoses() {
-      const today = new Date().toISOString().split('T')[0];
-      this.todaysDoses = [];
-
-      this.schedules.forEach(schedule => {
-        if (schedule.dailyTimes && this.isScheduleActiveToday(schedule, today)) {
-          schedule.dailyTimes.forEach(time => {
-            this.todaysDoses.push({
-              scheduleId: schedule._id,
-              time: time,
-              medicine: schedule.medicine,
-              dosageAmount: schedule.dosageAmount,
-              unit: schedule.unit,
-              taken: this.isDoseTaken(schedule._id, time, today),
-              takenAt: this.getDoseTakenTime(schedule._id, time, today)
-            });
-          });
-        }
-      });
-
-      // Sort by time
-      this.todaysDoses.sort((a, b) => a.time.localeCompare(b.time));
-    },
-
-    isScheduleActiveToday(schedule, today) {
-      const startDate = new Date(schedule.startDate).toISOString().split('T')[0];
-      const endDate = new Date(schedule.endDate).toISOString().split('T')[0];
-      return today >= startDate && today <= endDate;
-    },
-
-    isDoseReady(doseTime) {
-      const now = new Date();
-      const [hours, minutes] = doseTime.split(':').map(Number);
-      const doseDateTime = new Date();
-      doseDateTime.setHours(hours, minutes, 0, 0);
-
-      return now >= doseDateTime;
-    },
-
-    getDoseStatus(dose) {
-      if (dose.taken) return 'taken';
-      if (this.isDoseReady(dose.time)) return 'ready';
-      return 'scheduled';
-    },
-
-    getTimeUntilDose(doseTime) {
-      const now = new Date();
-      const [hours, minutes] = doseTime.split(':').map(Number);
-      const doseDateTime = new Date();
-      doseDateTime.setHours(hours, minutes, 0, 0);
-
-      if (doseDateTime <= now) {
-        return 'Now';
-      }
-
-      const diffMs = doseDateTime - now;
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-      if (diffHours > 0) {
-        return `in ${diffHours}h ${diffMinutes}m`;
-      } else {
-        return `in ${diffMinutes}m`;
-      }
-    },
-
-    formatTime(time) {
-      if (!time) return '';
-      if (time.includes(':')) {
-        const [hours, minutes] = time.split(':');
-        const hour = parseInt(hours);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour % 12 || 12;
-        return `${displayHour}:${minutes} ${ampm}`;
-      }
-      return new Date(time).toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-    },
-
-    async markAsTaken(dose) {
-      try {
-        this.playNotificationSound();
-
-        const today = new Date().toISOString().split('T')[0];
-        const takenAt = new Date().toISOString();
-
-        // Mark dose as taken in local storage
-        this.markDoseAsTaken(dose.scheduleId, dose.time, today, takenAt);
-
-        // Update local state immediately
-        dose.taken = true;
-        dose.takenAt = takenAt;
-
-        // Show success notification
-        this.showNotification('Dose Taken', `${dose.medicine?.name} marked as taken`, 'success');
-
-        // Update stats by regenerating doses
-        this.generateTodaysDoses();
-
-      } catch (error) {
-        console.error('Error marking dose as taken:', error);
-        alert('Error marking dose as taken');
-      }
-    },
-
-    startTimeUpdater() {
-      this.timeUpdateInterval = setInterval(() => {
-        this.currentTime = new Date();
-        this.checkForDueNotifications();
-      }, 60000); // Update every minute
-    },
-
-    async requestNotificationPermission() {
-      if ('Notification' in window) {
-        this.notificationPermission = await Notification.requestPermission();
-      }
-    },
-
-    setupNotificationScheduler() {
-      // Check for upcoming doses every minute
-      setInterval(() => {
-        this.checkForUpcomingDoses();
-      }, 60000);
-    },
-
-    checkForDueNotifications() {
-      // Check if any doses became ready and need notifications
-      this.todaysDoses.forEach(dose => {
-        if (!dose.taken && this.isDoseReady(dose.time)) {
-          const now = new Date();
-          const [hours, minutes] = dose.time.split(':').map(Number);
-          const doseDateTime = new Date();
-          doseDateTime.setHours(hours, minutes, 0, 0);
-
-          // Check if it's within 1 minute of dose time
-          const timeDiff = Math.abs(now - doseDateTime);
-          if (timeDiff < 60000) { // Within 1 minute
-            this.sendDoseNotification(dose);
-          }
-        }
-      });
-    },
-
-    checkForUpcomingDoses() {
-      this.checkForDueNotifications();
-    },
-
-    sendDoseNotification(dose) {
-      // Play sound
-      this.playNotificationSound();
-
-      // Show browser notification
-      if (this.notificationPermission === 'granted') {
-        const notification = new Notification('💊 Time for your medicine!', {
-          body: `${dose.medicine?.name} - ${dose.dosageAmount} ${dose.unit}`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          tag: `dose-${dose.scheduleId}-${dose.time}`,
-          requireInteraction: true
-        });
-
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-        };
-      }
-
-      // Show in-app notification
-      this.showNotification(
-        '💊 Medicine Time!',
-        `Time to take ${dose.medicine?.name}`,
-        'warning'
-      );
-    },
-
-    playNotificationSound() {
-      try {
-        // Create a more pleasant notification sound
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-      } catch (error) {
-        console.log('Could not play notification sound:', error);
-      }
-    },
-
-    showNotification(title, message, type = 'info') {
-      // Simple console log for now - you can implement toast notifications
-      console.log(`${type.toUpperCase()}: ${title} - ${message}`);
-
-      // Show different types of notifications
-      if (type === 'warning') {
-        // More prominent notification for medicine time
-        if (confirm(`${title}\n${message}\n\nWould you like to mark it as taken?`)) {
-          // Find the dose and mark it
-          const dose = this.todaysDoses.find(d =>
-            d.medicine?.name === message.split('Time to take ')[1] &&
-            !d.taken &&
-            this.isDoseReady(d.time)
-          );
-          if (dose) {
-            this.markAsTaken(dose);
-          }
-        }
-      } else if (type === 'success') {
-        // Success notification can be less intrusive
-        setTimeout(() => {
-          console.log('Success notification cleared');
-        }, 3000);
-      }
     }
   },
 
@@ -633,14 +295,6 @@ export default {
       while (this.form.dailyTimes.length < this.form.frequencyPerDay) {
         this.form.dailyTimes.push('09:00');
       }
-    },
-
-    // Watch for schedule changes to regenerate doses
-    schedules: {
-      handler() {
-        this.generateTodaysDoses();
-      },
-      deep: true
     }
   }
 };
@@ -911,170 +565,5 @@ export default {
 .btn-secondary:disabled {
   background: #e0e0e0;
   cursor: not-allowed;
-}
-
-/* Today's Doses Section */
-.todays-doses {
-  margin-bottom: 2rem;
-}
-
-.dose-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.dose-card {
-  background: white;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-.dose-card.ready {
-  border-color: #f59e0b;
-  background: #fffbeb;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
-}
-
-.dose-card.taken {
-  border-color: #10b981;
-  background: #f0fdf4;
-  opacity: 0.8;
-}
-
-.dose-card.scheduled {
-  border-color: #6b7280;
-  background: #f9fafb;
-}
-
-.dose-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.dose-time {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #6366f1;
-}
-
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.status-badge.taken {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-badge.ready {
-  background: #fef3c7;
-  color: #92400e;
-  animation: pulse 2s infinite;
-}
-
-.status-badge.scheduled {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.dose-content h4 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #1f2937;
-}
-
-.dosage {
-  color: #6b7280;
-  margin-bottom: 0.75rem;
-}
-
-.time-info {
-  margin: 0.75rem 0;
-}
-
-.time-ready {
-  color: #dc2626;
-  font-weight: 600;
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0.5; }
-}
-
-.time-countdown {
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.medicine-alerts {
-  margin: 0.75rem 0;
-}
-
-.food-alert {
-  color: #f59e0b;
-  font-size: 0.875rem;
-  margin: 0.25rem 0;
-}
-
-.avoid-alert {
-  color: #dc2626;
-  font-size: 0.875rem;
-  margin: 0.25rem 0;
-}
-
-.dose-actions {
-  margin-top: 1rem;
-}
-
-.btn-take-dose {
-  width: 100%;
-  padding: 0.75rem;
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-take-dose:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.taken-info {
-  text-align: center;
-  color: #6b7280;
-  font-style: italic;
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .dose-card {
-    padding: 1rem;
-  }
-
-  .dose-header {
-    flex-direction: column;
-    gap: 0.5rem;
-    text-align: center;
-  }
 }
 </style>
