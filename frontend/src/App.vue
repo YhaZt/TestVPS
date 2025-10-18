@@ -15,6 +15,7 @@
           >
             {{ tab.label }}
           </button>
+          <router-link to="/calendar" class="nav-link">Calendar</router-link>
         </nav>
       </div>
     </header>
@@ -42,6 +43,7 @@
           </aside>
         </div>
       </div>
+      <router-view />
     </main>
   </div>
 </template>
@@ -236,5 +238,15 @@ body {
   .logo-icon {
     font-size: 1.3rem;
   }
+}
+
+.nav-link {
+  margin-right: 12px;
+  text-decoration: none;
+  color: #374151;
+}
+.nav-link.router-link-active {
+  color: #6366f1;
+  font-weight: 600;
 }
 </style>

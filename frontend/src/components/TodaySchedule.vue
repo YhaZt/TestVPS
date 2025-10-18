@@ -69,6 +69,22 @@
       </div>
     </div>
   </div>
+
+  <section>
+    <div v-if="nextDose" class="next-dose-card">
+      <!-- show nextDose summary with a small Done button -->
+    </div>
+
+    <div class="card">
+      <div class="card-title">Upcoming</div>
+      <!-- render not-taken doses except nextDose, ascending -->
+    </div>
+
+    <details class="card">
+      <summary class="card-title">Completed ({{ completed.length }})</summary>
+      <!-- render taken doses -->
+    </details>
+  </section>
 </template>
 
 <script>
@@ -271,13 +287,22 @@ export default {
         this.currentTime = new Date();
 
         // Auto-refresh doses every 5 minutes
-        const now = new Date();
-        if (this.lastRefresh && (now - this.lastRefresh) > 5 * 60 * 1000) {
+        if (this.lastRefresh && (this.currentTime - this.lastRefresh) > 5 * 60 * 1000) {
           this.fetchTodaysDoses();
         }
 
         this.$forceUpdate();
       }, 60000); // Update every minute
+    }
+  },
+  computed: {
+    nextDose() {
+      const pending = this.todaysDoses.filter(d => !d.taken).sort((a,b)=>a.time.localeCompare(b.time));
+      const after = pending.find(d => this.isDoseReady(d.time));
+      return after || pending[0] || null;
+    },
+    completed() {
+      return this.todaysDoses.filter(d => d.taken).sort((a,b)=>a.time.localeCompare(b.time));
     }
   }
 };
