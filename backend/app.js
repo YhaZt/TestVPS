@@ -7,7 +7,8 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://scheduler.carpeldreams.me/'],
+  origin: 'https://scheduler.carpeldreams.me', // remove the slash
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
 app.use(express.json());
@@ -43,7 +44,7 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const Schedule = require('../models/Schedule');
-const Medicine = require('../models/Medicine');
+const Schedule = require('../models/schedule');
+const Medicine = require('../models/medicine');
 const DoseLog = require('../models/DoseLog');
 
 // GET all schedules
@@ -219,7 +219,7 @@ router.post('/:id/doses/unmark', async (req, res) => {
     console.error('POST /schedules/:id/doses/unmark error:', error);
     res.status(400).json({ success: false, error: error.message });
   }
-});
+}); 
 
 // Delete
 router.delete('/:id', async (req, res) => {
